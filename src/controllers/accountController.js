@@ -7,6 +7,14 @@ const createAccount = async (req, res) => {
     return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
   }
 
+  if (userid.length <= 6) {
+  return res.status(400).json({ error: 'Seu login deve ter mais de 6 caracteres.' });
+  }
+
+  if (user_pass.length <= 6) {
+  return res.status(400).json({ error: 'Seu senha deve ter maisde 6 caracteres.' });
+  }
+
   if (sex !== 'M' && sex !== 'F') {
     return res.status(400).json({ error: 'Sexo inválido. Use M ou F.' });
   }
@@ -34,7 +42,7 @@ const createAccount = async (req, res) => {
       SELECT
         COALESCE(MAX(ACCOUNT_ID), 0) + 1,
         ?, ?, ?, ?,
-        0, 0, 0, 0, 0, 0, 0, NULL,
+        1, 0, 0, 0, 0, 0, 0, NULL,
         9, '', 0, 0, 0, NULL, 0
       FROM login
     `;
