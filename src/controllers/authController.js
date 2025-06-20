@@ -28,8 +28,14 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'Email já cadastrado.' });
     }
 
-    // Gerar userid baseado no nome
-    const userid = name.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 1000);
+    const [existingLogin] = await conn.query(
+      'SELECT userid FROM login WHERE userid = ?',
+      [name]
+    );
+
+    if (existingLogin.length > 0) {
+      return res.status(400).json({ error: 'Login já cadastrado.' });
+    }
 
     // Inserir novo usuário
     const insertQuery = `
@@ -46,9 +52,9 @@ const register = async (req, res) => {
     `;
 
     const [result] = await conn.query(insertQuery, [
-      userid,
+      name,
       password,
-      email
+      email,
     ]);
 
     // Gerar token JWT
@@ -64,7 +70,9 @@ const register = async (req, res) => {
         id: result.insertId,
         name,
         email,
-        createdAt: new Date()
+        pontos: 0,
+        voto_data1: null,
+        voto_data2: null
       }
     });
   } catch (err) {
@@ -89,8 +97,7 @@ const login = async (req, res) => {
 
     // Buscar usuário pelo email
     const [users] = await conn.query(
-      `SELECT account_id, userid, user_pass, email, 
-       DATE_FORMAT(lastlogin, '%Y-%m-%d %H:%i:%s') AS createdAt 
+      `SELECT account_id, userid, user_pass, email, pontos, voto_data1, voto_data2
        FROM login WHERE userid = ? and user_pass = ?`,
       [login, password]
     );
@@ -114,9 +121,11 @@ const login = async (req, res) => {
         id: user.account_id,
         name: user.userid,
         email: user.email,
-        createdAt: user.createdAt
+        pontos: user.pontos,
+        voto_data1: user.voto_data1,
+        voto_data2: user.voto_data2,
       }
-    });
+    }); 
   } catch (err) {
     console.error('Erro no login:', err);
     res.status(500).json({ error: 'Erro no servidor.' });
@@ -134,8 +143,7 @@ const getMe = async (req, res) => {
     conn = await db.getConnection();
 
     const [users] = await conn.query(
-      `SELECT account_id AS id, userid AS name, email, 
-       DATE_FORMAT(lastlogin, '%Y-%m-%d %H:%i:%s') AS createdAt 
+      `SELECT account_id AS id, userid AS name, email, pontos, voto_data1, voto_data2
        FROM login WHERE account_id = ?`,
       [userId]
     );
@@ -153,8 +161,64 @@ const getMe = async (req, res) => {
   }
 };
 
+// Função para obter dados do usuário autenticado
+const ComputaVoto = async (req, res) => {
+  const { userId, btnvoto} = req.body;
+
+  let conn;
+  try {
+    conn = await db.getConnection();
+
+    const [users] = await conn.query(
+      `SELECT voto_data1, voto_data2
+       FROM login WHERE account_id = ?`,
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    // Atualiza da data da ultima atualização 
+    const insertQuery = `
+    
+    `;
+
+    if (btnvoto = 1) {
+      if (users.voto_data1 === now()) {
+        return res.status(404).json({ error: 'Você já votou hoje nesse site, volte amanha!' });
+      } else {
+        const [result] = await conn.query(insertQuery, [
+          userId,
+          voto_data1,
+          voto_data2,
+        ]);
+      }
+    } else
+    if (btnvoto = 2) {
+      if (users.voto_data2 === now()) {
+        return res.status(404).json({ error: 'Você já votou hoje nesse site, volte amanha!' });
+      } else {
+        const [result] = await conn.query(insertQuery, [
+          userId,
+          voto_data1,
+          voto_data2,
+        ]);
+      }
+    }
+
+    res.json(users[0]);
+  } catch (err) {
+    console.error('Erro ao buscar usuário:', err);
+    res.status(500).json({ error: 'Erro no servidor.' });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  ComputaVoto
 };
