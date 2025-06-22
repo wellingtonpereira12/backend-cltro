@@ -59,7 +59,10 @@ const register = async (req, res) => {
 
     // Gerar token JWT
     const token = jwt.sign(
-      { id: result.insertId, email },
+      { 
+        id: result.insertId,  
+        email 
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
@@ -110,10 +113,14 @@ const login = async (req, res) => {
 
     // Gerar token JWT
     const token = jwt.sign(
-      { id: user.account_id, email: user.email },
+      { 
+        id: user.account_id,  // Use 'id' como chave
+        email: user.email 
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
+
 
     res.json({
       token,
@@ -161,64 +168,96 @@ const getMe = async (req, res) => {
   }
 };
 
-// Função para obter dados do usuário autenticado
-const ComputaVoto = async (req, res) => {
-  const { userId, btnvoto} = req.body;
-
-  let conn;
-  try {
-    conn = await db.getConnection();
-
-    const [users] = await conn.query(
-      `SELECT voto_data1, voto_data2
-       FROM login WHERE account_id = ?`,
-      [userId]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+  // Função para obter dados do usuário autenticado
+  const computaVoto = async (req, res) => {
+    console.log('computaVoto')
+    if (!req.user || !req.user.id) {
+    return res.status(401).json({ error: 'Usuário não autenticado' });
     }
 
-    // Atualiza da data da ultima atualização 
-    const insertQuery = `
-    
-    `;
+    // Get user ID from verified token
+    const userId = req.user.id;
+    const { btnvoto } = req.body;
 
-    if (btnvoto = 1) {
-      if (users.voto_data1 === now()) {
-        return res.status(404).json({ error: 'Você já votou hoje nesse site, volte amanha!' });
-      } else {
-        const [result] = await conn.query(insertQuery, [
-          userId,
-          voto_data1,
-          voto_data2,
-        ]);
-      }
-    } else
-    if (btnvoto = 2) {
-      if (users.voto_data2 === now()) {
-        return res.status(404).json({ error: 'Você já votou hoje nesse site, volte amanha!' });
-      } else {
-        const [result] = await conn.query(insertQuery, [
-          userId,
-          voto_data1,
-          voto_data2,
-        ]);
-      }
+    // Validate input
+    if (!btnvoto || (btnvoto !== 1 && btnvoto !== 2)) {
+      return res.status(400).json({ error: 'Botão de voto inválido.' });
     }
 
-    res.json(users[0]);
-  } catch (err) {
-    console.error('Erro ao buscar usuário:', err);
-    res.status(500).json({ error: 'Erro no servidor.' });
-  } finally {
-    if (conn) conn.release();
-  }
-};
+
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      // Get current vote status (parameterized)
+      const [users] = await conn.query(
+        `SELECT voto_data1, voto_data2, pontos FROM login WHERE account_id = ?`,
+        [userId]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const user = users[0];
+      const hoje = new Date().toISOString().slice(0, 10);
+      const voteDate = btnvoto === 1 ? user.voto_data1 : user.voto_data2;
+
+      // Check if already voted today
+      if (voteDate && new Date(voteDate).toISOString().slice(0, 10) === hoje) {
+        return res.status(400).json({ error: 'Você já votou hoje nesse site, volte amanhã!' });
+      }
+
+      // Update vote and points in single transaction
+      await conn.query('START TRANSACTION');
+      
+      if (btnvoto === 1) {
+        await conn.query(
+          `UPDATE login SET voto_data1 = NOW(), pontos = pontos + 1 WHERE account_id = ?`,
+          [userId]
+        );
+      } else {
+        await conn.query(
+          `UPDATE login SET voto_data2 = NOW(), pontos = pontos + 1 WHERE account_id = ?`,
+          [userId]
+        );
+      }
+
+      // Get updated user data
+      const [updatedUsers] = await conn.query(
+        `SELECT account_id AS id, userid AS name, email, pontos, voto_data1, voto_data2
+        FROM login WHERE account_id = ?`,
+        [userId]
+      );
+      
+      await conn.query('COMMIT');
+
+      const updatedUser = updatedUsers[0];
+      
+      // Generate new token with updated points
+      const token = jwt.sign(
+        { id: updatedUser.id, email: updatedUser.email },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      res.json({
+        token,
+        user: updatedUser
+      });
+    } catch (err) {
+      await conn.query('ROLLBACK');
+      console.error('Erro ao computar voto:', err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    } finally {
+      if (conn) conn.release();
+    }
+  };
+
 
 module.exports = {
   register,
   login,
   getMe,
-  ComputaVoto
+  computaVoto
 };

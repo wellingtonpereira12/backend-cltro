@@ -3,13 +3,12 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Rota para registro de nova conta
+// Rotas públicas
 router.post('/register', authController.register);
-
-// Rota para autenticação
 router.post('/login', authController.login);
 
-// Rota para obter dados do usuário autenticado
+// Rotas protegidas (requerem autenticação)
+router.post('/computaVoto', authMiddleware, authController.computaVoto);
 router.get('/me', authMiddleware, authController.getMe);
 
 module.exports = router;
