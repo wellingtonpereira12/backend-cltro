@@ -39,6 +39,7 @@ class MercadoPagoService {
       return {
         success: true,
         init_point: response.init_point,
+        json: response
       };
 
 

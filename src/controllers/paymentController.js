@@ -91,10 +91,12 @@ const PaymentController = {
 
       const resposta = await MercadoPagoService.criarLinkPagamento(accessToken, dadosPagamento);
       console.log(resposta)
+
+      
+
       res.json({
         resposta
       });
-      
     } catch (error) {
       console.error('Erro no controller de pagamento direto:', error);
       

@@ -3,10 +3,14 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 const PaymentController = require('../controllers/paymentController');
+const { receiveNotification } = require('../controllers/webhookController');
+const validateSignature = require('../middlewares/validateSignature');
 
 // Rotas públicas
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/webhook', validateSignature, receiveNotification);
+
 
 // Rotas protegidas (requerem autenticação)
 router.post('/computaVoto', authMiddleware, authController.computaVoto);
