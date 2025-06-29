@@ -1,6 +1,7 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const validationUtils = require('../utils/validationUtils');
+const db = require('../config/db');
 
 const MERCADOPAGO_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
@@ -60,33 +61,36 @@ const mercadoPagoService = {
   },
 
   handlePaymentStatus: async (payment) => {
-    console.log(`Processando pagamento ${payment.id} - Status: ${payment.status}`);
-    
-    // Implemente sua lógica de negócio aqui
-    switch (payment.status) {
-      case 'approved':
-        console.log('✅ Pagamento aprovado');
-        break;
-      case 'pending':
-        console.log('⏳ Pagamento pendente');
-        break;
-      case 'rejected':
-        console.log('❌ Pagamento rejeitado');
-        break;
-      case 'refunded':
-        console.log('↩️ Pagamento reembolsado');
-        break;
-      default:
-        console.log(`⚠️ Status não tratado: ${payment.status}`);
+    console.log(`Processando pagamento ${payment.id} - Status: ${payment.status}`, payment);
+
+    let conn;
+
+    try {
+      conn = await db.getConnection();
+
+      // Atualiza o pagamento no banco de dados
+      const [result] = await conn.query(
+        `UPDATE pagamentos
+        SET status = ?
+        WHERE id = ?`,
+        [
+          payment.status,                       
+          Number(payment.external_reference)              
+        ]
+      );
+
+      // Verifica se algum registro foi atualizado
+      if (result.affectedRows === 0) {
+        console.warn(`⚠️ Nenhum pagamento com ID ${payment.id} foi encontrado para atualizar.`);
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao atualizar o pagamento:', error);
+    } finally {
+      if (conn) conn.release();
     }
-    
-    // Exemplo de dados úteis:
-    console.log('Detalhes:', {
-      orderId: payment.external_reference,
-      amount: payment.transaction_amount,
-      payer: payment.payer.email
-    });
   }
+
 };
 
 module.exports = mercadoPagoService;

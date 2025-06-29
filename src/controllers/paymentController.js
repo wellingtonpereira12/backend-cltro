@@ -18,9 +18,6 @@ const PaymentController = {
         return res.status(401).json({ error: 'Usuário não autenticado' });
       }
 
-      const user = req.user;
-
-      // Get user ID from verified token
       const userId = req.user.id;
       const { btnPagamento } = req.body;
       console.log(req)
@@ -86,13 +83,12 @@ const PaymentController = {
 
       const dadosPagamento = {
         transaction_amount: valorTransaction_amount, 
-        description: "Doação para CLTRO"
+        description: "Doação para CLTRO",
+        userId: userId
       };
 
       const resposta = await MercadoPagoService.criarLinkPagamento(accessToken, dadosPagamento);
       console.log(resposta)
-
-      
 
       res.json({
         resposta

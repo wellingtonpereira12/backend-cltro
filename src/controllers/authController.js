@@ -121,6 +121,12 @@ const bcrypt = require('bcryptjs');
         { expiresIn: process.env.JWT_EXPIRES_IN }
       );
 
+      const [pagamentos] = await conn.query(
+        `SELECT id, data, status, valor
+        FROM pagamentos WHERE account_id = ?
+        order by id desc`,
+        [user.account_id]
+      );
 
       res.json({
         token,
@@ -131,7 +137,8 @@ const bcrypt = require('bcryptjs');
           pontos: user.pontos,
           voto_data1: user.voto_data1,
           voto_data2: user.voto_data2,
-        }
+        },
+        pagamentos: pagamentos
       }); 
     } catch (err) {
       console.error('Erro no login:', err);
@@ -159,7 +166,17 @@ const bcrypt = require('bcryptjs');
         return res.status(404).json({ error: 'Usuário não encontrado.' });
       }
 
-      res.json(users[0]);
+      const [pagamentos] = await conn.query(
+        `SELECT id, data, status, valor
+        FROM pagamentos WHERE account_id = ?
+        order by id desc`,
+        [userId]
+      );
+
+      res.json({
+        user: users[0],
+        pagamentos: pagamentos
+      });
     } catch (err) {
       console.error('Erro ao buscar usuário:', err);
       res.status(500).json({ error: 'Erro no servidor.' });
