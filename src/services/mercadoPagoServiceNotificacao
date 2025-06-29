@@ -1,0 +1,93 @@
+const axios = require('axios');
+const crypto = require('crypto');
+const validationUtils = require('../utils/validationUtils');
+
+const MERCADOPAGO_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
+const WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
+
+const mercadoPagoService = {
+  processNotification: async (body, headers) => {
+    const notificationId = body.id;
+    const resourceId = body.data.id;
+    const eventType = body.type;
+
+    console.log(body);
+
+    if (!body || !body.data || !body.id) {
+      throw new Error('Estrutura de notificação inválida');
+    }
+
+    // Validação condicional de assinatura
+    if (WEBHOOK_SECRET) {
+      try {
+        validationUtils.validateSignature(
+          headers['x-signature'] || headers['X-Signature'],
+          body,
+          WEBHOOK_SECRET
+        );
+      } catch (signatureError) {
+        console.warn('Aviso: Falha na validação de assinatura:', signatureError.message);
+        // Decida aqui se quer bloquear ou apenas registrar o aviso
+        // throw signatureError; // Descomente para bloquear notificações não assinadas
+      }
+    }
+
+    // Buscar detalhes do pagamento
+    const paymentDetails = await mercadoPagoService.fetchPaymentDetails(resourceId);
+    
+    // Processar status
+    await mercadoPagoService.handlePaymentStatus(paymentDetails);
+
+    return {
+      notificationId,
+      resourceId,
+      status: paymentDetails.status
+    };
+  },
+
+  fetchPaymentDetails: async (paymentId) => {
+    try {
+      const response = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: {
+          'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar detalhes:', error.response?.data || error.message);
+      throw new Error('Falha na comunicação com Mercado Pago');
+    }
+  },
+
+  handlePaymentStatus: async (payment) => {
+    console.log(`Processando pagamento ${payment.id} - Status: ${payment.status}`);
+    
+    // Implemente sua lógica de negócio aqui
+    switch (payment.status) {
+      case 'approved':
+        console.log('✅ Pagamento aprovado');
+        break;
+      case 'pending':
+        console.log('⏳ Pagamento pendente');
+        break;
+      case 'rejected':
+        console.log('❌ Pagamento rejeitado');
+        break;
+      case 'refunded':
+        console.log('↩️ Pagamento reembolsado');
+        break;
+      default:
+        console.log(`⚠️ Status não tratado: ${payment.status}`);
+    }
+    
+    // Exemplo de dados úteis:
+    console.log('Detalhes:', {
+      orderId: payment.external_reference,
+      amount: payment.transaction_amount,
+      payer: payment.payer.email
+    });
+  }
+};
+
+module.exports = mercadoPagoService;
+
