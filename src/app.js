@@ -5,6 +5,8 @@ const authRoutes = require('./routes/authRoutes'); // Importe apenas as rotas de
 
 const app = express();
 
+require('dotenv').config();
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use('/api/auth',authRoutes);
@@ -16,3 +18,5 @@ app.get('/health', (req, res) => {
 });
 
 module.exports = app;
+
+

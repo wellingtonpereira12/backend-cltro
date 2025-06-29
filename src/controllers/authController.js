@@ -2,171 +2,171 @@ const db = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-// Função para registrar novo usuário
-const register = async (req, res) => {
-  const { name, email, password } = req.body;
+  // Função para registrar novo usuário
+  const register = async (req, res) => {
+    const { name, email, password } = req.body;
 
-  // Validações
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
-  }
-
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres.' });
-  }
-  let conn;
-  try {
-    conn = await db.getConnection();  
-
-    // Verificar se email já existe
-    const [existing] = await conn.query(
-      'SELECT email FROM login WHERE email = ?',
-      [email]
-    );
-
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'Email já cadastrado.' });
+    // Validações
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
     }
 
-    const [existingLogin] = await conn.query(
-      'SELECT userid FROM login WHERE userid = ?',
-      [name]
-    );
-
-    if (existingLogin.length > 0) {
-      return res.status(400).json({ error: 'Login já cadastrado.' });
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres.' });
     }
+    let conn;
+    try {
+      conn = await db.getConnection();  
 
-    // Inserir novo usuário
-    const insertQuery = `
-      INSERT INTO login
-      (ACCOUNT_ID, userid, user_pass, sex, email, group_id, state,
-       unban_time, expiration_time, logincount, lastlogin, last_ip, birthdate, character_slots, pincode,
-       pincode_change, vip_time, old_group, web_auth_token, web_auth_token_enabled)
-      SELECT
-        COALESCE(MAX(ACCOUNT_ID), 0) + 1,
-        ?, ?, 'M', ?,
-        1, 0, 0, 0, 0, 0, 0, NULL,
-        9, '', 0, 0, 0, NULL, 0
-      FROM login
-    `;
+      // Verificar se email já existe
+      const [existing] = await conn.query(
+        'SELECT email FROM login WHERE email = ?',
+        [email]
+      );
 
-    const [result] = await conn.query(insertQuery, [
-      name,
-      password,
-      email,
-    ]);
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Email já cadastrado.' });
+      }
 
-    // Gerar token JWT
-    const token = jwt.sign(
-      { 
-        id: result.insertId,  
-        email 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
+      const [existingLogin] = await conn.query(
+        'SELECT userid FROM login WHERE userid = ?',
+        [name]
+      );
 
-    res.status(201).json({
-      token,
-      user: {
-        id: result.insertId,
+      if (existingLogin.length > 0) {
+        return res.status(400).json({ error: 'Login já cadastrado.' });
+      }
+
+      // Inserir novo usuário
+      const insertQuery = `
+        INSERT INTO login
+        (ACCOUNT_ID, userid, user_pass, sex, email, group_id, state,
+        unban_time, expiration_time, logincount, lastlogin, last_ip, birthdate, character_slots, pincode,
+        pincode_change, vip_time, old_group, web_auth_token, web_auth_token_enabled)
+        SELECT
+          COALESCE(MAX(ACCOUNT_ID), 0) + 1,
+          ?, ?, 'M', ?,
+          1, 0, 0, 0, 0, 0, 0, NULL,
+          9, '', 0, 0, 0, NULL, 0
+        FROM login
+      `;
+
+      const [result] = await conn.query(insertQuery, [
         name,
+        password,
         email,
-        pontos: 0,
-        voto_data1: null,
-        voto_data2: null
-      }
-    });
-  } catch (err) {
-    console.error('Erro no registro:', err);
-    res.status(500).json({ error: 'Erro no servidor.' });
-  } finally {
-    if (conn) conn.release();
-  }
-};
+      ]);
 
-// Função para autenticar usuário
-const login = async (req, res) => {
-  const { login, password } = req.body;
+      // Gerar token JWT
+      const token = jwt.sign(
+        { 
+          id: result.insertId,  
+          email 
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
 
-  if (!login || !password) {
-    return res.status(400).json({ error: 'Login e senha são obrigatórios.' });
-  }
+      res.status(201).json({
+        token,
+        user: {
+          id: result.insertId,
+          name,
+          email,
+          pontos: 0,
+          voto_data1: null,
+          voto_data2: null
+        }
+      });
+    } catch (err) {
+      console.error('Erro no registro:', err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    } finally {
+      if (conn) conn.release();
+    }
+  };
 
-  let conn;
-  try {
-    conn = await db.getConnection();
+  // Função para autenticar usuário
+  const login = async (req, res) => {
+    const { login, password } = req.body;
 
-    // Buscar usuário pelo email
-    const [users] = await conn.query(
-      `SELECT account_id, userid, user_pass, email, pontos, voto_data1, voto_data2
-       FROM login WHERE userid = ? and user_pass = ?`,
-      [login, password]
-    );
-
-    if (users.length === 0) {
-      return res.status(401).json({ error: 'Credenciais inválidas..' });
+    if (!login || !password) {
+      return res.status(400).json({ error: 'Login e senha são obrigatórios.' });
     }
 
-    const user = users[0];
+    let conn;
+    try {
+      conn = await db.getConnection();
 
-    // Gerar token JWT
-    const token = jwt.sign(
-      { 
-        id: user.account_id,  // Use 'id' como chave
-        email: user.email 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
+      // Buscar usuário pelo email
+      const [users] = await conn.query(
+        `SELECT account_id, userid, user_pass, email, pontos, voto_data1, voto_data2
+        FROM login WHERE userid = ? and user_pass = ?`,
+        [login, password]
+      );
 
-
-    res.json({
-      token,
-      user: {
-        id: user.account_id,
-        name: user.userid,
-        email: user.email,
-        pontos: user.pontos,
-        voto_data1: user.voto_data1,
-        voto_data2: user.voto_data2,
+      if (users.length === 0) {
+        return res.status(401).json({ error: 'Credenciais inválidas..' });
       }
-    }); 
-  } catch (err) {
-    console.error('Erro no login:', err);
-    res.status(500).json({ error: 'Erro no servidor.' });
-  } finally {
-    if (conn) conn.release();
-  }
-};
 
-// Função para obter dados do usuário autenticado
-const getMe = async (req, res) => {
-  const userId = req.user.id;
+      const user = users[0];
 
-  let conn;
-  try {
-    conn = await db.getConnection();
+      // Gerar token JWT
+      const token = jwt.sign(
+        { 
+          id: user.account_id,  // Use 'id' como chave
+          email: user.email 
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
 
-    const [users] = await conn.query(
-      `SELECT account_id AS id, userid AS name, email, pontos, voto_data1, voto_data2
-       FROM login WHERE account_id = ?`,
-      [userId]
-    );
 
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+      res.json({
+        token,
+        user: {
+          id: user.account_id,
+          name: user.userid,
+          email: user.email,
+          pontos: user.pontos,
+          voto_data1: user.voto_data1,
+          voto_data2: user.voto_data2,
+        }
+      }); 
+    } catch (err) {
+      console.error('Erro no login:', err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    } finally {
+      if (conn) conn.release();
     }
+  };
 
-    res.json(users[0]);
-  } catch (err) {
-    console.error('Erro ao buscar usuário:', err);
-    res.status(500).json({ error: 'Erro no servidor.' });
-  } finally {
-    if (conn) conn.release();
-  }
-};
+  // Função para obter dados do usuário autenticado
+  const getMe = async (req, res) => {
+    const userId = req.user.id;
+
+    let conn;
+    try {
+      conn = await db.getConnection();
+
+      const [users] = await conn.query(
+        `SELECT account_id AS id, userid AS name, email, pontos, voto_data1, voto_data2
+        FROM login WHERE account_id = ?`,
+        [userId]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      res.json(users[0]);
+    } catch (err) {
+      console.error('Erro ao buscar usuário:', err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    } finally {
+      if (conn) conn.release();
+    }
+  };
 
   // Função para obter dados do usuário autenticado
   const computaVoto = async (req, res) => {
@@ -255,9 +255,9 @@ const getMe = async (req, res) => {
   };
 
 
-module.exports = {
-  register,
-  login,
-  getMe,
-  computaVoto
-};
+  module.exports = {
+    register,
+    login,
+    getMe,
+    computaVoto
+  };
