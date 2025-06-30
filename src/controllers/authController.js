@@ -128,6 +128,26 @@ const bcrypt = require('bcryptjs');
         [user.account_id]
       );
 
+      const [totalPagamentos] = await conn.query(
+        `SELECT IFNULL(SUM(valor), 0) AS valor
+          FROM pagamentos
+          WHERE account_id = ?
+            AND status = 'approved'
+            AND processado = 0;
+          `,
+        [user.account_id]
+      );
+
+      const [totalCash] = await conn.query(
+        `SELECT value AS valor
+          FROM acc_reg_num
+          where account_id = ?
+          AND \`key\` = '#CASHPOINTS'
+          `,
+        [user.account_id]
+      );
+
+
       res.json({
         token,
         user: {
@@ -138,7 +158,9 @@ const bcrypt = require('bcryptjs');
           voto_data1: user.voto_data1,
           voto_data2: user.voto_data2,
         },
-        pagamentos: pagamentos
+        pagamentos: pagamentos,
+        totalPagamentos : totalPagamentos[0],
+        totalCash : totalCash[0]
       }); 
     } catch (err) {
       console.error('Erro no login:', err);
@@ -173,9 +195,30 @@ const bcrypt = require('bcryptjs');
         [userId]
       );
 
+      const [totalPagamentos] = await conn.query(
+        `SELECT IFNULL(SUM(valor), 0) AS valor
+          FROM pagamentos
+          WHERE account_id = ?
+            AND status = 'approved'
+            AND processado = 0
+          `,
+        [userId]
+      );
+
+      const [totalCash] = await conn.query(
+        `SELECT value AS valor
+          FROM acc_reg_num
+          where account_id = ?
+          AND \`key\` = '#CASHPOINTS'
+          `,
+        [userId]
+      );
+
       res.json({
         user: users[0],
-        pagamentos: pagamentos
+        pagamentos: pagamentos,
+        totalPagamentos : totalPagamentos[0],
+        totalCash: totalCash[0]
       });
     } catch (err) {
       console.error('Erro ao buscar usuário:', err);
@@ -271,10 +314,147 @@ const bcrypt = require('bcryptjs');
     }
   };
 
+  const processarCash = async (req, res) => {
+    const userId = req.user.id;
+
+    let conn;
+    try {
+      conn = await db.getConnection();
+      await conn.beginTransaction(); // <- Início da transação
+
+      const [users] = await conn.query(
+        `SELECT account_id AS id, userid AS name, email, pontos, voto_data1, voto_data2
+        FROM login WHERE account_id = ?`,
+        [userId]
+      );
+
+      if (users.length === 0) {
+        await conn.rollback();
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const [rows] = await conn.query(
+        `SELECT online FROM \`char\` WHERE account_id = ?`,
+        [userId]
+      );
+
+      if (rows[0].online === 1) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Favor deslogar a sua conta.' });
+      }
+
+      const [totalPagamentos] = await conn.query(
+        `SELECT IFNULL(SUM(valor), 0) AS valor
+        FROM pagamentos
+        WHERE account_id = ?
+        AND status = 'approved'
+        AND processado = 0`,
+        [userId]
+      );
+
+      if (totalPagamentos[0].valor === 0) {
+        await conn.rollback();
+        return res.status(404).json({ error: 'Não há cash para processar.' });
+      }
+
+      const [pagamentos] = await conn.query(
+        `SELECT id, valor
+        FROM pagamentos 
+        WHERE account_id = ?
+        AND status = 'approved'
+        AND processado = 0`,
+        [userId]
+      );
+
+      for (let i = 0; i < pagamentos.length; i++) {
+        const pagamento = pagamentos[i];
+        const pagamentoId = pagamento.id;
+        const valor = parseFloat(pagamento.valor);
+        let cash = 0;
+
+        if (valor === 1) cash = 10000;
+        else if (valor === 25) cash = 30000;
+        else if (valor === 50) cash = 70000;
+        else if (valor === 100) cash = 150000;
+        else continue;
+
+        const [rowsCash] = await conn.query(
+          `SELECT * FROM acc_reg_num
+          WHERE account_id = ? AND \`key\` = '#CASHPOINTS'`,
+          [userId]
+        );
+
+        if (rowsCash.length > 0) {
+          const atual = parseInt(rowsCash[0].value || 0);
+          const novoValor = atual + cash;
+          await conn.query(
+            `UPDATE acc_reg_num 
+            SET value = ? 
+            WHERE account_id = ? AND \`key\` = '#CASHPOINTS'`,
+            [novoValor, userId]
+          );
+        } else {
+          await conn.query(
+            `INSERT INTO acc_reg_num (account_id, \`key\`, value)
+            VALUES (?, '#CASHPOINTS', ?)`,
+            [userId, cash]
+          );
+        }
+
+        await conn.query(
+          `UPDATE pagamentos 
+          SET processado = 1 
+          WHERE id = ?`,
+          [pagamentoId]
+        );
+      }
+
+      await conn.commit(); // <- Finaliza a transação com sucesso
+
+      const [resultPagamentos] = await conn.query(
+        `SELECT id, data, status, valor
+        FROM pagamentos WHERE account_id = ?
+        order by id desc`,
+        [userId]
+      );
+
+      const [resultTotalPagamentos] = await conn.query(
+        `SELECT IFNULL(SUM(valor), 0) AS valor
+          FROM pagamentos
+          WHERE account_id = ?
+            AND status = 'approved'
+            AND processado = 0;
+          `,
+        [userId]
+      );
+
+      const [resultTotalCash] = await conn.query(
+        `SELECT value AS valor
+          FROM acc_reg_num
+          where account_id = ?
+          AND \`key\` = '#CASHPOINTS'
+          `,
+        [userId]
+      );
+
+      res.json({ success: true,
+                 pagamentos: resultPagamentos,
+                 totalPagamentos : resultTotalPagamentos[0],
+                 totalCash: resultTotalCash[0]
+       });
+    } catch (err) {
+      if (conn) await conn.rollback(); // <- Reverte caso ocorra erro
+      console.error('Erro ao processar pagamentos:', err);
+      res.status(500).json({ error: 'Erro no servidor.' });
+    } finally {
+      if (conn) conn.release();
+    }
+  };
 
   module.exports = {
     register,
     login,
     getMe,
-    computaVoto
+    computaVoto,
+    processarCash
   };

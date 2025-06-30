@@ -15,5 +15,6 @@ router.post('/webhook/mercadopago', mercadoPagoController.handleWebhook);
 router.post('/computaVoto', authMiddleware, authController.computaVoto);
 router.get('/me', authMiddleware, authController.getMe);
 router.post('/pagamento-direto', authMiddleware, PaymentController.criarPagamentoDireto);
+router.post('/processarCash', authMiddleware,  authController.processarCash);
 
 module.exports = router;
