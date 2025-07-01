@@ -4,10 +4,7 @@ const qs = require('querystring');
 class OAuthService {
   // Obter token para a aplicação (não para usuário)
   static async getAppToken() {
-    console.log('getAppToken2')
     try {
-      console.log('client_id:', process.env.MP_CLIENT_ID);
-      console.log('client_secret:', process.env.MP_CLIENT_SECRET);
       const response = await axios.post(
         'https://api.mercadopago.com/oauth/token',
         qs.stringify({
@@ -22,7 +19,6 @@ class OAuthService {
           }
         }
       );
-      console.log('getAppToken2 1 ', response)
 
       return {
         access_token: response.data.access_token,

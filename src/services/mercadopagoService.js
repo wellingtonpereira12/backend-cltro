@@ -44,7 +44,6 @@ class MercadoPagoService {
       };
 
       const response = await preference.create({ body: preferenceData });
-      console.log("Resposta do Mercado Pago:", response);
 
       return {
         success: true,

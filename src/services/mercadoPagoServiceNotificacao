@@ -12,8 +12,6 @@ const mercadoPagoService = {
     const resourceId = body.data.id;
     const eventType = body.type;
 
-    console.log(body);
-
     if (!body || !body.data || !body.id) {
       throw new Error('Estrutura de notificação inválida');
     }
@@ -61,7 +59,6 @@ const mercadoPagoService = {
   },
 
   handlePaymentStatus: async (payment) => {
-    console.log(`Processando pagamento ${payment.id} - Status: ${payment.status}`, payment);
 
     let conn;
 

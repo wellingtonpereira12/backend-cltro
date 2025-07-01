@@ -11,7 +11,6 @@ const tokenCache = {
 
 const PaymentController = {
   async criarPagamentoDireto(req, res) {
-    console.log('criarPagamentoDireto')
     try {
 
       if (!req.user || !req.user.id) {
@@ -20,7 +19,6 @@ const PaymentController = {
 
       const userId = req.user.id;
       const { btnPagamento } = req.body;
-      console.log(req)
       // Validate input
       if (!btnPagamento || (btnPagamento !== 1 && btnPagamento !== 2 && btnPagamento !== 3 && btnPagamento !== 4)) {
         return res.status(400).json({ error: 'Botão de voto inválido.' });
@@ -32,10 +30,8 @@ const PaymentController = {
       
       // Se token expirado ou não existente, obter novo
       if (!accessToken || tokenCache.expiresAt < now) {
-        console.log('!accessToken || tokenCache.expiresAt < now')
         // Se temos refresh token, tentar renovar
         if (tokenCache.refreshToken) {
-          console.log('tokenCache.refreshToken')
           try {
             const newTokens = await OAuthService.refreshToken(tokenCache.refreshToken);
             accessToken = newTokens.access_token;
@@ -49,7 +45,6 @@ const PaymentController = {
             // Continuamos para tentar obter novo token com credenciais
           }
         }
-        console.log('2')
         // Se ainda não temos token, obter com credenciais
         if (!accessToken) {
           const appTokens = await OAuthService.getAppToken();
@@ -88,7 +83,6 @@ const PaymentController = {
       };
 
       const resposta = await MercadoPagoService.criarLinkPagamento(accessToken, dadosPagamento);
-      console.log(resposta)
 
       res.json({
         resposta

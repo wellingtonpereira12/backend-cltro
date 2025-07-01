@@ -230,7 +230,6 @@ const bcrypt = require('bcryptjs');
 
   // Função para obter dados do usuário autenticado
   const computaVoto = async (req, res) => {
-    console.log('computaVoto')
     if (!req.user || !req.user.id) {
     return res.status(401).json({ error: 'Usuário não autenticado' });
     }
