@@ -24,36 +24,35 @@ const PaymentController = {
         return res.status(400).json({ error: 'Botão de voto inválido.' });
       }
 
-      // 1. Verificar se temos token válido
+      // Se token expirado ou não existente, obter novo
       const now = Date.now();
       let accessToken = tokenCache.accessToken;
-      
+
       // Se token expirado ou não existente, obter novo
       if (!accessToken || tokenCache.expiresAt < now) {
-        // Se temos refresh token, tentar renovar
         if (tokenCache.refreshToken) {
           try {
             const newTokens = await OAuthService.refreshToken(tokenCache.refreshToken);
             accessToken = newTokens.access_token;
-            
-            // Atualizar cache
+
+            // Atualiza token e força expiração em 10 minutos
             tokenCache.accessToken = newTokens.access_token;
             tokenCache.refreshToken = newTokens.refresh_token;
-            tokenCache.expiresAt = now + (newTokens.expires_in * 1000);
+            tokenCache.expiresAt = now + (10 * 60 * 1000); // FORÇAR 10 minutos
           } catch (refreshError) {
             console.error('Falha ao renovar token:', refreshError);
-            // Continuamos para tentar obter novo token com credenciais
           }
         }
+
         // Se ainda não temos token, obter com credenciais
         if (!accessToken) {
           const appTokens = await OAuthService.getAppToken();
           accessToken = appTokens.access_token;
-          
-          // Atualizar cache
+
           tokenCache.accessToken = appTokens.access_token;
-          tokenCache.expiresAt = now + (appTokens.expires_in * 1000);
-          tokenCache.userId = 'system'; // Identificador para token da aplicação
+          tokenCache.refreshToken = appTokens.refresh_token;
+          tokenCache.expiresAt = now + (10 * 60 * 1000); // FORÇAR 10 minutos
+          tokenCache.userId = 'system';
         }
       }
 

@@ -1,4 +1,4 @@
-const mercadoPagoService = require('../services/mercadoPagoServiceNotificacao');
+const mercadoPagoService = require('../services/mercadoPagoServiceNotificacao.js');
 
 const mercadoPagoController = {
   handleWebhook: async (req, res) => {
