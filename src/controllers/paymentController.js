@@ -1,14 +1,6 @@
 const MercadoPagoService = require('../services/mercadopagoService');
 const OAuthService = require('../services/oauthService'); // Serviço para gerenciar tokens
 
-// Cache em memória para tokens (em produção, use Redis ou banco de dados)
-const tokenCache = {
-  accessToken: null,
-  refreshToken: null,
-  expiresAt: null,
-  userId: null
-};
-
 const PaymentController = {
   async criarPagamentoDireto(req, res) {
     try {
@@ -26,35 +18,9 @@ const PaymentController = {
 
       // Se token expirado ou não existente, obter novo
       const now = Date.now();
-      let accessToken = tokenCache.accessToken;
 
-      // Se token expirado ou não existente, obter novo
-      if (!accessToken || tokenCache.expiresAt < now) {
-        if (tokenCache.refreshToken) {
-          try {
-            const newTokens = await OAuthService.refreshToken(tokenCache.refreshToken);
-            accessToken = newTokens.access_token;
-
-            // Atualiza token e força expiração em 10 minutos
-            tokenCache.accessToken = newTokens.access_token;
-            tokenCache.refreshToken = newTokens.refresh_token;
-            tokenCache.expiresAt = now + (10 * 60 * 1000); // FORÇAR 10 minutos
-          } catch (refreshError) {
-            console.error('Falha ao renovar token:', refreshError);
-          }
-        }
-
-        // Se ainda não temos token, obter com credenciais
-        if (!accessToken) {
-          const appTokens = await OAuthService.getAppToken();
-          accessToken = appTokens.access_token;
-
-          tokenCache.accessToken = appTokens.access_token;
-          tokenCache.refreshToken = appTokens.refresh_token;
-          tokenCache.expiresAt = now + (10 * 60 * 1000); // FORÇAR 10 minutos
-          tokenCache.userId = 'system';
-        }
-      }
+      const appTokens = await OAuthService.getAppToken();
+      accessToken = appTokens.access_token;
 
       let valorTransaction_amount;
 
