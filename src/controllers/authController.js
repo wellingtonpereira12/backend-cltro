@@ -76,7 +76,9 @@ const bcrypt = require('bcryptjs');
           pontos: 0,
           voto_data1: null,
           voto_data2: null
-        }
+        },
+        totalPagamentos : { "valor": 0 },
+        totalCash : { "valor": 0 },
       });
     } catch (err) {
       console.error('Erro no registro:', err);
@@ -139,7 +141,7 @@ const bcrypt = require('bcryptjs');
       );
 
       const [totalCash] = await conn.query(
-        `SELECT value AS valor
+        `SELECT IFNULL(SUM(value), 0) AS valor
           FROM acc_reg_num
           where account_id = ?
           AND \`key\` = '#CASHPOINTS'
@@ -206,7 +208,7 @@ const bcrypt = require('bcryptjs');
       );
 
       const [totalCash] = await conn.query(
-        `SELECT value AS valor
+        `SELECT IFNULL(SUM(value), 0) AS valor
           FROM acc_reg_num
           where account_id = ?
           AND \`key\` = '#CASHPOINTS'
@@ -337,9 +339,11 @@ const bcrypt = require('bcryptjs');
         [userId]
       );
 
-      if (rows[0].online === 1) {
-        await conn.rollback();
-        return res.status(400).json({ error: 'Favor deslogar a sua conta.' });
+      if (rows[0]) {
+        if (rows[0].online !== null && rows[0].online === 1) {
+          await conn.rollback();
+          return res.status(400).json({ error: 'Favor deslogar a sua conta.' });
+        }
       }
 
       const [totalPagamentos] = await conn.query(
