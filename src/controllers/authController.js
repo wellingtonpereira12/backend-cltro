@@ -47,7 +47,7 @@ const bcrypt = require('bcryptjs');
           COALESCE(MAX(ACCOUNT_ID), 0) + 1,
           ?, ?, 'M', ?,
           1, 0, 0, 0, 0, 0, 0, NULL,
-          9, '', 0, 0, 0, NULL, 0
+          15, '', 0, 0, 0, NULL, 0
         FROM login
       `;
 
