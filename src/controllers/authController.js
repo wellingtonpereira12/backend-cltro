@@ -375,7 +375,7 @@ const bcrypt = require('bcryptjs');
         const valor = parseFloat(pagamento.valor);
         let cash = 0;
 
-        if (valor === 1) cash = 10000;
+        if (valor === 10) cash = 10000;
         else if (valor === 25) cash = 30000;
         else if (valor === 50) cash = 70000;
         else if (valor === 100) cash = 150000;
