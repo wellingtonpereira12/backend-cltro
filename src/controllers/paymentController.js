@@ -26,7 +26,7 @@ const PaymentController = {
 
       switch (btnPagamento) {
         case 1:
-          valorTransaction_amount = 1;
+          valorTransaction_amount = 10;
           break;
         case 2:
           valorTransaction_amount = 25;
